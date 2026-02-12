@@ -1,23 +1,42 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 import Navbar from '../components/Navbar';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
-import { Mail, Lock, LogIn } from 'lucide-react';
+import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 
 const Login = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate login
-        setTimeout(() => {
+        setError('');
+
+        try {
+            const response = await api.post('/auth/login', { email, password });
+
+            // Save token and user data
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user', JSON.stringify({
+                id: response.data._id,
+                name: response.data.name,
+                email: response.data.email
+            }));
+
+            // navigate('/dashboard');
+            window.location.href = '/dashboard';
+        } catch (err) {
+            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+        } finally {
             setLoading(false);
-            navigate('/dashboard');
-        }, 1500);
+        }
     };
 
     return (
@@ -37,26 +56,46 @@ const Login = () => {
                         <p className="text-gray-500 dark:text-gray-400 mt-2">Access your secure vault</p>
                     </div>
 
+                    {error && (
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg text-sm flex items-center gap-2 mb-4">
+                            <AlertCircle size={16} /> {error}
+                        </div>
+                    )}
+
                     <form onSubmit={handleLogin} className="space-y-5">
-                        <Input icon={Mail} placeholder="Email Address" type="email" required />
-                        <Input icon={Lock} placeholder="Password" type="password" required />
+                        <Input
+                            icon={Mail}
+                            placeholder="Email Address"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                        <Input
+                            icon={Lock}
+                            placeholder="Password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
 
                         <div className="flex items-center justify-between text-sm">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <input type="checkbox" className="rounded bg-gray-200 dark:bg-black/40 border-gray-400 dark:border-gray-600 text-neon-blue focus:ring-neon-blue checked:bg-neon-blue" />
                                 <span className="text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Remember me</span>
                             </label>
-                            <a href="#" className="text-blue-600 dark:text-neon-blue hover:text-purple-600 dark:hover:text-neon-purple transition-colors">Forgot Password?</a>
                         </div>
 
-                        <Button variant="primary" className="w-full justify-center" type="submit" disabled={loading}>
-                            {loading ? 'Authenticating...' : 'Login'} {!loading && <LogIn size={18} />}
+                        <Button variant="primary" type="submit" className="w-full justify-center mt-6 shadow-[0_0_20px_rgba(0,229,255,0.3)]" disabled={loading}>
+                            {loading ? <Loader className="animate-spin" size={20} /> : 'Access Vault'}
                         </Button>
                     </form>
 
-                    <p className="mt-8 text-center text-gray-500 dark:text-gray-400 text-sm">
-                        Don't have an account? <Link to="/signup" className="text-blue-600 dark:text-neon-blue hover:underline font-semibold">Sign up</Link>
-                    </p>
+                    <div className="mt-6 flex justify-between items-center text-sm">
+                        <Link to="/forgot-password" className="text-gray-400 hover:text-white transition-colors">Forgot Password?</Link>
+                        <Link to="/signup" className="text-neon-blue hover:underline font-semibold">Create Vault</Link>
+                    </div>
                 </Card>
             </div>
         </div>

@@ -9,16 +9,17 @@ export default {
         extend: {
             colors: {
                 neon: {
-                    blue: '#00f3ff',
-                    purple: '#bc13fe',
-                    green: '#39ff14',
+                    blue: '#00E5FF',
+                    purple: '#7C4DFF',
+                    green: '#00E676',
+                    red: '#FF1744',
                 },
                 background: 'rgb(var(--bg-background))',
                 foreground: 'rgb(var(--text-primary))',
                 card: 'rgb(var(--bg-card))',
                 dark: {
-                    bg: '#0a0a0a', // Keep legacy for fixed dark elements
-                    card: '#1a1a1a',
+                    bg: '#0B0F1A',
+                    card: 'rgba(255, 255, 255, 0.08)',
                 }
             },
         },

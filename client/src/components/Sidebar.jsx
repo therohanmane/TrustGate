@@ -1,14 +1,18 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, Users, Activity, Settings, LogOut, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Activity, Settings, LogOut, ShieldCheck, AlertTriangle, Timer, Unlock, HelpCircle } from 'lucide-react';
 
 const Sidebar = () => {
     const links = [
         { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
-        { icon: FileText, label: "My Assets", path: "/dashboard/assets" },
+        { icon: FileText, label: "My Vault", path: "/dashboard/assets" },
         { icon: Users, label: "Trusted Contacts", path: "/dashboard/contacts" },
+        { icon: Timer, label: "Inactivity Rules", path: "/dashboard/rules" },
+        { icon: AlertTriangle, label: "Safety Tools", path: "/dashboard/safety" },
+        { icon: Unlock, label: "Release Status", path: "/dashboard/status" },
         { icon: Activity, label: "Activity Logs", path: "/dashboard/activity" },
         { icon: Settings, label: "Settings", path: "/dashboard/settings" },
+        { icon: HelpCircle, label: "Support", path: "/dashboard/support" },
     ];
 
     return (
@@ -35,7 +39,16 @@ const Sidebar = () => {
             </div>
 
             <div className="p-4 border-t border-gray-200 dark:border-white/10">
-                <button className="flex items-center gap-3 px-4 py-3 text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 w-full rounded-xl transition-all font-medium">
+                <button
+                    onClick={() => {
+                        if (window.confirm('Are you sure you want to logout?')) {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('user');
+                            window.location.href = '/login';
+                        }
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-red-500 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 w-full rounded-xl transition-all font-medium"
+                >
                     <LogOut size={20} />
                     <span>Logout</span>
                 </button>

@@ -1,0 +1,20 @@
+{
+    "name": "trustgate-root",
+    "version": "1.0.0",
+    "description": "Root package.json to manage both client and server",
+    "scripts": {
+        "start": "npx concurrently \"npm run server\" \"npm run client\"",
+        "start:client": "cd client && npm run dev",
+        "start:server": "cd server && npm run dev",
+        "server": "cd server && npm run dev",
+        "client": "cd client && npm run dev",
+        "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+        "dev": "npx concurrently \"npm run server\" \"npm run client\""
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
