@@ -96,13 +96,13 @@ const Overview = () => {
                             {recentLogs.map((log) => {
                                 const { icon: Icon, color, bg } = getIcon(log.action);
                                 return (
-                                    <div key={log._id} className="flex items-start gap-3 p-3 hover:bg-white/5 rounded-lg transition-colors">
+                                    <div key={log._id} className="flex items-start gap-3 p-3 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
                                         <div className={`p-2 rounded-lg ${bg} ${color} shrink-0`}>
                                             <Icon size={16} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-white truncate text-sm">{formatAction(log.action)}</p>
-                                            <p className="text-gray-400 text-xs truncate">{log.details}</p>
+                                            <p className="font-medium text-gray-900 dark:text-white truncate text-sm">{formatAction(log.action)}</p>
+                                            <p className="text-gray-500 dark:text-gray-400 text-xs truncate">{log.details}</p>
                                         </div>
                                         <span className="text-xs text-gray-500 whitespace-nowrap">
                                             {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}

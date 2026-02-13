@@ -19,7 +19,7 @@ const ThemeToggle = () => {
         <div className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-2 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
             >
                 <ActiveIcon size={20} />
             </button>
@@ -30,7 +30,7 @@ const ThemeToggle = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute right-0 mt-2 w-36 bg-gray-900 border border-white/10 rounded-xl shadow-xl overflow-hidden z-50"
+                        className="absolute right-0 mt-2 w-36 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden z-50"
                     >
                         {Object.keys(icons).map((key) => {
                             const Icon = icons[key];
@@ -41,7 +41,7 @@ const ThemeToggle = () => {
                                         setTheme(key);
                                         setIsOpen(false);
                                     }}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${theme === key ? 'text-neon-blue bg-white/5' : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${theme === key ? 'text-blue-600 dark:text-neon-blue bg-blue-50 dark:bg-white/5' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
                                         }`}
                                 >
                                     <Icon size={16} />

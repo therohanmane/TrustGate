@@ -12,6 +12,7 @@ import Overview from './dashboard/Overview';
 import Assets from './dashboard/Assets';
 import { Bell, Search } from 'lucide-react';
 import Input from '../components/ui/Input';
+import ThemeToggle from '../components/ThemeToggle';
 import api from '../utils/api';
 
 const Dashboard = () => {
@@ -53,10 +54,13 @@ const Dashboard = () => {
                             <Input icon={Search} placeholder="Search assets..." className="!py-2 !text-sm" />
                         </div>
 
-                        <button className="relative text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                            <Bell size={24} />
-                            <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
-                        </button>
+                        <div className="flex items-center gap-4">
+                            <ThemeToggle />
+                            <button className="relative text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                                <Bell size={24} />
+                                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
+                            </button>
+                        </div>
 
                         <div className="flex items-center gap-3 pl-6 border-l border-gray-200 dark:border-white/10">
                             <div className="text-right hidden md:block">
