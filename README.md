@@ -1,74 +1,90 @@
-# TrustGate - Controlled Digital Asset Release System
+# TrustGate — Controlled Digital Asset Release System
+
+> **Built by [PaviqLabs](https://paviqlabs.com)** — India's premier digital security studio.
 
 TrustGate is a secure digital vault that monitors your activity and releases your critical digital assets to trusted contacts only when you become inactive.
 
 ## 🚀 Features
 
-- **Secure Asset Storage**: AES-256 encryption for files.
-- **Inactivity Monitoring**: Customizable dead man's switch.
-- **Trusted Contacts**: Assign beneficiaries with granular access levels.
-- **Activity Logs**: detailed audit trail of all actions.
-- **Modern UI**: Dark/Neon specialized design for cybersecurity aesthetic.
+- **Secure Asset Storage** — AES-256 encryption for all files via Firebase Cloud Storage
+- **Inactivity Monitoring** — Customizable dead man's switch with Node-Cron scheduling
+- **Trusted Contacts** — Assign beneficiaries with granular access permissions
+- **RBAC** — Role-Based Access Control for admin & user separation
+- **Activity Logs** — Detailed audit trail of all actions
+- **Fully Responsive UI** — Mobile-first design, works on all devices (320px → 4K)
+- **Docker Ready** — Containerized with Docker Compose for easy deployment
+- **CI/CD** — GitHub Actions pipeline for automated builds
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React (Vite), Tailwind CSS, Framer Motion, Lucide React
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 19, Vite, CSS3, Framer Motion, Lucide React |
+| **Backend** | Node.js, Express.js, REST API |
+| **Database** | MongoDB (Atlas Cloud) |
+| **Storage** | Firebase Cloud Storage (local disk fallback) |
+| **Auth** | JWT, bcrypt, RBAC |
+| **Scheduling** | Node-Cron |
+| **DevOps** | Docker, Docker Compose, GitHub Actions |
 
-## 📦 Installation & Setup
+## 📦 Quick Start
 
 ### Prerequisites
-- Node.js (v16+)
-- MongoDB (running locally or cloud URI)
+- Node.js v20+
+- MongoDB (local or Atlas URI)
 
-### 1. Backend Setup
-
+### 1. Install all dependencies
 ```bash
-cd server
-npm install
+npm run install:all
 ```
 
-Create a `.env` file in `server/`:
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/trustgate
-JWT_SECRET=your_secret_key
+### 2. Configure environment
+```bash
+cp server/.env.example server/.env
+# Fill in your values
 ```
 
-Start the server:
+### 3. Run in development
 ```bash
 npm run dev
 ```
+- Frontend → http://localhost:5173
+- Backend  → http://localhost:5000
 
-### 2. Frontend Setup
-
-Open a new terminal:
+### 4. Run with Docker
 ```bash
-cd client
-npm install
+docker-compose up --build
 ```
-
-Start the development server:
-```bash
-npm run dev
-```
-
-Visit `http://localhost:5173` to view the application.
-
-## 🎨 Design System
-
-- **Colors**: Dark Background (`#0a0a0a`), Neon Blue (`#00f3ff`), Neon Purple (`#bc13fe`).
-- **Components**: Glassmorphism cards, Gradient buttons, Animated transitions.
 
 ## 📂 Project Structure
 
-- `client/`: React Frontend
-  - `src/components/ui`: Reusable UI components (Button, Card, Input)
-  - `src/pages`: Application pages (Landing, Login, Dashboard)
-- `server/`: Node.js Backend
-  - `models/`: Mongoose Schemas (User, Asset, Contact)
-  - `routes/`: API Endpoints
+```
+TrustGate/
+├── client/                   # React frontend (Vite)
+│   ├── src/
+│   │   ├── components/       # Sidebar, Navbar, UI components
+│   │   ├── pages/            # Landing, Login, Signup, Dashboard
+│   │   └── utils/            # API client
+│   ├── Dockerfile
+│   └── nginx.conf
+├── server/                   # Node.js backend
+│   ├── config/               # Firebase, env validation
+│   ├── middleware/            # Auth, RBAC, rate limiter, validator
+│   ├── models/               # User, Asset, Contact, OtpStore
+│   ├── routes/               # auth, users, assets, contacts, safety, logs
+│   ├── utils/                # encryption, mailer, inactivityJob, firebaseStorage
+│   └── Dockerfile
+├── .github/workflows/ci.yml  # GitHub Actions CI/CD
+└── docker-compose.yml
+```
+
+## 🔐 Environment Variables
+
+See [`server/.env.example`](server/.env.example) for all required variables including Firebase setup.
 
 ---
-© 2026 TrustGate Project
+
+<div align="center">
+  <strong>© 2026 TrustGate</strong> — Empowering Indian families to secure their digital legacy.<br/>
+  Built with ❤️ by <a href="https://paviqlabs.com"><strong>PaviqLabs</strong></a>
+</div>

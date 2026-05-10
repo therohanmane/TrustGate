@@ -291,10 +291,20 @@ export default function Landing() {
             <div className="fu d5" style={{ display:'flex', gap:24, color:'#8892aa', fontSize:'clamp(11px,1.2vw,13px)', flexWrap:'wrap', justifyContent:'center' }}>
               {['🔒 AES-256 Encrypted','🇮🇳 Made in India','🆓 Free to Start'].map(t => <span key={t}>{t}</span>)}
             </div>
-            <div className="fi d6 tg-footer" style={{ position:'absolute', bottom:0, left:0, right:0, padding:'0 var(--px-mobile) 24px' }}>
-              <span style={{ fontSize:11, color:'#8892aa' }}>© 2026 TrustGate — Empowering Indian families.</span>
-              <div className="tg-footer-links">
-                {['Privacy Policy','Terms of Service','Support'].map(l => <span key={l} style={{ fontSize:12, color:'#8892aa', cursor:'pointer' }}>{l}</span>)}
+            <div className="fi d6 tg-footer" style={{ position:'absolute', bottom:0, left:0, right:0, padding:'0 var(--px-mobile) 20px', flexDirection:'column', gap:10, alignItems:'center', textAlign:'center' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center' }}>
+                <span style={{ fontSize:11, color:'#8892aa' }}>© 2026 TrustGate — Empowering Indian families.</span>
+                <span style={{ fontSize:11, color:'rgba(201,168,76,0.3)' }}>·</span>
+                <span style={{ fontSize:11, color:'rgba(201,168,76,0.55)', fontWeight:500 }}>
+                  Built by{' '}
+                  <a href="https://paviqlabs.com" target="_blank" rel="noopener noreferrer"
+                    style={{ color:'#e8c97a', fontWeight:700, textDecoration:'none', fontFamily:"'Syne',sans-serif", letterSpacing:'0.02em' }}>
+                    PaviqLabs
+                  </a>
+                </span>
+              </div>
+              <div className="tg-footer-links" style={{ justifyContent:'center' }}>
+                {['Privacy Policy','Terms of Service','Support'].map(l => <span key={l} style={{ fontSize:11, color:'#8892aa', cursor:'pointer' }}>{l}</span>)}
               </div>
             </div>
           </div>
