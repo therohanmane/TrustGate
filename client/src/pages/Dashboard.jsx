@@ -10,7 +10,7 @@ import Settings from './dashboard/Settings';
 import Support from './dashboard/Support';
 import Overview from './dashboard/Overview';
 import Assets from './dashboard/Assets';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, Menu, X } from 'lucide-react';
 import Input from '../components/ui/Input';
 import ThemeToggle from '../components/ThemeToggle';
 import api from '../utils/api';
@@ -18,6 +18,7 @@ import api from '../utils/api';
 const Dashboard = () => {
     const location = useLocation();
     const [user, setUser] = useState({ name: 'User', avatar: '', isVerified: false });
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -25,72 +26,95 @@ const Dashboard = () => {
                 const res = await api.get('/users/profile');
                 setUser(res.data);
             } catch (err) {
-                console.error("Failed to fetch user profile", err);
+                console.error('Failed to fetch user profile', err);
             }
         };
         fetchUser();
     }, []);
 
+    // Close sidebar on route change (mobile)
+    useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
     const getPageTitle = () => {
         const path = location.pathname.split('/').pop();
         if (path === 'dashboard') return 'Overview';
-        if (path === 'rules') return 'Inactivity Rules';
-        if (path === 'safety') return 'Safety Tools';
-        if (path === 'status') return 'Release Status';
+        if (path === 'rules')   return 'Inactivity Rules';
+        if (path === 'safety')  return 'Safety Tools';
+        if (path === 'status')  return 'Release Status';
         if (path === 'support') return 'Help & Support';
         return path.charAt(0).toUpperCase() + path.slice(1);
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-neon-blue/30 transition-colors duration-300">
-            <Sidebar />
-            <div className="ml-64 p-8">
-                {/* Top Navbar */}
-                <header className="flex justify-between items-center mb-8 bg-white/80 dark:bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-gray-200 dark:border-white/5 sticky top-8 z-30 transition-colors">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors">{getPageTitle()}</h2>
+        <div style={{ minHeight:'100vh', background:'var(--ink)', color:'var(--cream)', display:'flex', position:'relative', overflowX:'hidden' }}>
+            {/* Backdrop overlay — mobile only */}
+            {sidebarOpen && (
+                <div
+                    onClick={() => setSidebarOpen(false)}
+                    style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:39, backdropFilter:'blur(2px)' }}
+                />
+            )}
 
-                    <div className="flex items-center gap-6">
-                        <div className="hidden md:block w-64">
-                            <Input icon={Search} placeholder="Search assets..." className="!py-2 !text-sm" />
+            {/* Sidebar */}
+            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+            {/* Main Content */}
+            <div className="dash-main" style={{ flex:1, minWidth:0, paddingTop:16 }}>
+                {/* Top Bar */}
+                <header style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, background:'rgba(255,255,255,0.03)', backdropFilter:'blur(12px)', padding:'10px 16px', borderRadius:16, border:'1px solid var(--border)', position:'sticky', top:8, zIndex:30, gap:12 }}>
+                    {/* Hamburger — hidden on desktop via CSS */}
+                    <button
+                        onClick={() => setSidebarOpen(o => !o)}
+                        className="dash-hamburger"
+                        aria-label="Toggle sidebar"
+                        style={{ flexShrink:0 }}
+                    >
+                        {sidebarOpen ? <X size={20} color="var(--cream)" /> : <Menu size={20} color="var(--cream)" />}
+                    </button>
+
+                    <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:'clamp(16px,2vw,22px)', fontWeight:700, color:'var(--cream)', flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                        {getPageTitle()}
+                    </h2>
+
+                    <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+                        <div style={{ display:'none' }} className="search-desktop">
+                            <Input icon={Search} placeholder="Search assets..." />
                         </div>
-
-                        <div className="flex items-center gap-4">
-                            <ThemeToggle />
-                            <button className="relative text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                                <Bell size={24} />
-                                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-3 pl-6 border-l border-gray-200 dark:border-white/10">
-                            <div className="text-right hidden md:block">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                                <p className="text-xs text-green-600 dark:text-neon-green">Verified</p>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 dark:from-neon-blue dark:to-neon-purple p-[2px]">
-                                <div className="w-full h-full rounded-full bg-white dark:bg-gray-900 overflow-hidden">
+                        <ThemeToggle />
+                        <button style={{ position:'relative', background:'none', border:'none', cursor:'pointer', color:'var(--slate2)', minHeight:44, minWidth:44, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <Bell size={20} />
+                            <span style={{ position:'absolute', top:8, right:8, width:8, height:8, background:'#e05a5a', borderRadius:'50%' }}/>
+                        </button>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:12, borderLeft:'1px solid var(--border)' }}>
+                            <div style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg,#c9a84c,#e8c97a)', padding:2, flexShrink:0 }}>
+                                <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:'var(--ink)', overflow:'hidden' }}>
                                     <img
                                         src={user.avatar ? `http://localhost:5000${user.avatar}` : `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`}
-                                        alt="User"
-                                        className="w-full h-full object-cover"
+                                        alt={user.name}
+                                        style={{ width:'100%', height:'100%', objectFit:'cover' }}
                                     />
                                 </div>
+                            </div>
+                            <div style={{ display:'none', textAlign:'right' }} className="user-name-desktop">
+                                <p style={{ fontSize:13, fontWeight:600, color:'var(--cream)', margin:0 }}>{user.name}</p>
+                                <p style={{ fontSize:11, color:'#4ade80', margin:0 }}>Verified</p>
                             </div>
                         </div>
                     </div>
                 </header>
 
-                <div className="mt-8">
+                {/* Page Content */}
+                <div style={{ paddingTop:8 }}>
                     <Routes>
-                        <Route path="/" element={<Overview />} />
-                        <Route path="/assets" element={<Assets />} />
-                        <Route path="/rules" element={<Rules />} />
-                        <Route path="/safety" element={<Safety />} />
-                        <Route path="/status" element={<ReleaseStatus />} />
+                        <Route path="/"         element={<Overview />} />
+                        <Route path="/assets"   element={<Assets />} />
+                        <Route path="/rules"    element={<Rules />} />
+                        <Route path="/safety"   element={<Safety />} />
+                        <Route path="/status"   element={<ReleaseStatus />} />
                         <Route path="/contacts" element={<Contacts />} />
                         <Route path="/activity" element={<Activity />} />
                         <Route path="/settings" element={<Settings />} />
-                        <Route path="/support" element={<Support />} />
+                        <Route path="/support"  element={<Support />} />
                     </Routes>
                 </div>
             </div>
