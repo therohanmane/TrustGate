@@ -39,4 +39,19 @@ const protect = async (req, res, next) => {
     }
 };
 
-module.exports = { protect };
+/**
+ * authorizeRoles — Role-Based Access Control (RBAC) middleware.
+ * Usage: router.get('/admin-only', protect, authorizeRoles('admin'), handler)
+ *
+ * @param {...string} roles — Allowed roles, e.g. 'admin', 'user'
+ */
+const authorizeRoles = (...roles) => (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+        return res.status(403).json({
+            message: `Access denied — requires role: ${roles.join(' or ')}.`,
+        });
+    }
+    next();
+};
+
+module.exports = { protect, authorizeRoles };

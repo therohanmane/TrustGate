@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema({
     avatar: { type: String },
 
     isVerified: { type: Boolean, default: false },
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user',
+    },
     status: {
         type: String,
         enum: ['active', 'inactive'],

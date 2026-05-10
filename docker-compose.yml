@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+  # ── Backend API ──────────────────────────────────────────────────────────────
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: trustgate-server
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - trustgate-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Frontend (React + Nginx) ──────────────────────────────────────────────────
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: trustgate-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - trustgate-net
+
+# ── Volumes ────────────────────────────────────────────────────────────────────
+volumes:
+  uploads:
+    driver: local
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  trustgate-net:
+    driver: bridge

@@ -11,6 +11,10 @@ const helmet = require('helmet');
 const path = require('path');
 
 const { startInactivityJob } = require('./utils/inactivityJob');
+const { initFirebase }        = require('./config/firebase');
+
+// ── Initialise Firebase Admin (non-fatal — falls back to local disk) ──────────
+initFirebase();
 
 // ── App bootstrap ─────────────────────────────────────────────────────────────
 const app = express();

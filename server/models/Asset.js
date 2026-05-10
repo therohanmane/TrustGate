@@ -25,7 +25,8 @@ const assetSchema = new mongoose.Schema({
     fileUrl: {
         type: String,
         required: true,
-    },                                  // Path to the encrypted file on disk
+    },
+    storageBackend: { type: String, enum: ['firebase', 'local'], default: 'local' },
     fileType: { type: String },
     size: { type: String },
 

@@ -49,4 +49,8 @@ module.exports = {
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASS: process.env.EMAIL_PASS,
     NODE_ENV: process.env.NODE_ENV || 'development',
+    // Firebase (optional — falls back to local storage if not set)
+    FIREBASE_STORAGE_BUCKET:      process.env.FIREBASE_STORAGE_BUCKET      || '',
+    FIREBASE_SERVICE_ACCOUNT:     process.env.FIREBASE_SERVICE_ACCOUNT     || '',
+    FIREBASE_SERVICE_ACCOUNT_PATH: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
 };

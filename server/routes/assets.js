@@ -2,24 +2,20 @@
 
 const express = require('express');
 const router = express.Router();
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
-const crypto = require('crypto');
 
-const Asset = require('../models/Asset');
+const Asset   = require('../models/Asset');
 const Contact = require('../models/Contact');
-const { protect } = require('../middleware/authMiddleware');
-const { apiLimiter } = require('../middleware/rateLimiter');
+const { protect }                  = require('../middleware/authMiddleware');
+const { apiLimiter }               = require('../middleware/rateLimiter');
 const { assetRules, handleValidation } = require('../middleware/validate');
 const { encryptBuffer, decryptBuffer } = require('../utils/encryption');
+const { uploadEncryptedFile, downloadEncryptedFile, deleteStoredFile } = require('../utils/firebaseStorage');
 const logActivity = require('../utils/logger');
 
 router.use(apiLimiter);
 
-// ── Multer — store encrypted files in uploads/assets/ ────────────────────────
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'assets');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// ── Multer — memory storage only; encryption + cloud upload happens in route ──
 
 const storage = multer.memoryStorage(); // Buffer-only; we encrypt before writing
 
@@ -53,7 +49,7 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
-// ── POST /api/assets — upload & encrypt ──────────────────────────────────────
+// ── POST /api/assets — upload & encrypt to Firebase / local ─────────────────
 router.post('/', protect, upload.single('file'), assetRules, handleValidation, async (req, res) => {
     try {
         if (!req.file) {
@@ -62,20 +58,22 @@ router.post('/', protect, upload.single('file'), assetRules, handleValidation, a
 
         const { name, category, description } = req.body;
 
-        // Encrypt the file buffer
+        // 1. Encrypt the buffer in-memory
         const { iv, encryptedData } = encryptBuffer(req.file.buffer);
 
-        // Safe filename — no original name on disk
-        const safeFilename = `${crypto.randomBytes(16).toString('hex')}.enc`;
-        const filePath = path.join(UPLOAD_DIR, safeFilename);
-        fs.writeFileSync(filePath, encryptedData);
+        // 2. Upload encrypted buffer to Firebase Storage (or local fallback)
+        const { storageUrl, storageBackend } = await uploadEncryptedFile(
+            encryptedData,
+            req.user._id.toString()
+        );
 
         const asset = await Asset.create({
             user: req.user._id,
             name: name || req.file.originalname,
             description,
             category: category || 'document',
-            fileUrl: path.join('uploads', 'assets', safeFilename),
+            fileUrl: storageUrl,
+            storageBackend,
             fileType: req.file.mimetype,
             size: (req.file.size / 1024).toFixed(2) + ' KB',
             iv,
@@ -83,12 +81,10 @@ router.post('/', protect, upload.single('file'), assetRules, handleValidation, a
             status: 'secure',
         });
 
-        await logActivity(req.user._id, 'UPLOAD_ASSET', `Asset uploaded: ${asset.name}`, req);
+        await logActivity(req.user._id, 'UPLOAD_ASSET', `Asset uploaded: ${asset.name} [${storageBackend}]`, req);
 
-        // Return asset without IV
         const response = asset.toObject();
         delete response.iv;
-
         return res.status(201).json(response);
     } catch (err) {
         console.error('[Assets] Upload error:', err);
@@ -96,7 +92,7 @@ router.post('/', protect, upload.single('file'), assetRules, handleValidation, a
     }
 });
 
-// ── GET /api/assets/:id/download — decrypt & stream ──────────────────────────
+// ── GET /api/assets/:id/download — decrypt & stream from Firebase / local ────
 router.get('/:id/download', protect, async (req, res) => {
     try {
         const asset = await Asset.findById(req.params.id);
@@ -109,12 +105,12 @@ router.get('/:id/download', protect, async (req, res) => {
             return res.status(403).json({ message: 'Not authorised to access this asset.' });
         }
 
-        const filePath = path.join(__dirname, '..', asset.fileUrl);
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ message: 'File not found on server.' });
-        }
+        // Download from Firebase or local disk
+        const encryptedBuffer = await downloadEncryptedFile(
+            asset.fileUrl,
+            asset.storageBackend || 'local'
+        );
 
-        const encryptedBuffer = fs.readFileSync(filePath);
         const decryptedBuffer = asset.isEncrypted && asset.iv
             ? decryptBuffer(encryptedBuffer, asset.iv)
             : encryptedBuffer;
@@ -181,9 +177,8 @@ router.delete('/:id', protect, async (req, res) => {
             return res.status(403).json({ message: 'Not authorised to delete this asset.' });
         }
 
-        // Remove file from disk
-        const filePath = path.join(__dirname, '..', asset.fileUrl);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        // Delete from Firebase or local disk
+        await deleteStoredFile(asset.fileUrl, asset.storageBackend || 'local');
 
         await asset.deleteOne();
         await logActivity(req.user._id, 'DELETE_ASSET', `Asset deleted: ${asset.name}`, req);
