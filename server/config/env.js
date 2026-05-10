@@ -49,6 +49,10 @@ module.exports = {
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASS: process.env.EMAIL_PASS,
     NODE_ENV: process.env.NODE_ENV || 'development',
+    // Google OAuth (optional — set to enable Google Sign-In)
+    GOOGLE_CLIENT_ID:     process.env.GOOGLE_CLIENT_ID     || '',
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+    SERVER_URL: process.env.SERVER_URL || 'http://localhost:5000',
     // Firebase (optional — falls back to local storage if not set)
     FIREBASE_STORAGE_BUCKET:      process.env.FIREBASE_STORAGE_BUCKET      || '',
     FIREBASE_SERVICE_ACCOUNT:     process.env.FIREBASE_SERVICE_ACCOUNT     || '',

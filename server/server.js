@@ -12,6 +12,8 @@ const path = require('path');
 
 const { startInactivityJob } = require('./utils/inactivityJob');
 const { initFirebase }        = require('./config/firebase');
+const passport                = require('./config/passport');
+const session                 = require('express-session');
 
 // ── Initialise Firebase Admin (non-fatal — falls back to local disk) ──────────
 initFirebase();
@@ -47,6 +49,22 @@ app.use(
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+// ── Session (required only for OAuth redirect handshake — short TTL) ──────────
+app.use(session({
+    secret: process.env.JWT_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 5 * 60 * 1000, // 5 min — only needed for OAuth redirect
+    },
+}));
+
+// ── Passport ──────────────────────────────────────────────────────────────────
+app.use(passport.initialize());
+app.use(passport.session());
 
 // ── Trust proxy (needed for accurate IPs behind nginx/load-balancer) ──────────
 app.set('trust proxy', 1);

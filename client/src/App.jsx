@@ -7,6 +7,7 @@ import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import OAuthCallback from './pages/OAuthCallback';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/forgot-password"     element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/dashboard/*"         element={<Dashboard />} />
+        <Route path="/oauth/callback"       element={<OAuthCallback />} />
       </Routes>
     </BrowserRouter>
   );

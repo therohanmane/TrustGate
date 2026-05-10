@@ -267,4 +267,41 @@ router.post('/verify-aadhaar', protect, async (req, res) => {
     }
 });
 
+// ── GET /api/auth/google — initiate Google OAuth ──────────────────────────────
+const passport = require('../config/passport');
+
+router.get(
+    '/google',
+    passport.authenticate('google', {
+        scope: ['profile', 'email'],
+        session: true,
+    })
+);
+
+// ── GET /api/auth/google/callback — handle Google response ────────────────────
+router.get(
+    '/google/callback',
+    passport.authenticate('google', { session: true, failureRedirect: `${CLIENT_URL}/login?error=oauth_failed` }),
+    async (req, res) => {
+        try {
+            const { user, token } = req.user;
+
+            await logActivity(user._id, 'OAUTH_LOGIN', 'User signed in via Google OAuth.', req);
+
+            // Redirect to frontend with token in query params (picked up by OAuthCallback page)
+            const params = new URLSearchParams({
+                token,
+                _id:   user._id.toString(),
+                name:  user.name,
+                email: user.email,
+            });
+
+            return res.redirect(`${CLIENT_URL}/oauth/callback?${params.toString()}`);
+        } catch (err) {
+            console.error('[OAuth] Callback error:', err.message);
+            return res.redirect(`${CLIENT_URL}/login?error=oauth_failed`);
+        }
+    }
+);
+
 module.exports = router;

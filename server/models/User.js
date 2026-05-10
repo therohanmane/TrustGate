@@ -21,7 +21,8 @@ const userSchema = new mongoose.Schema({
     },
     phone: { type: String, trim: true },
     aadhaarNumber: { type: String },
-    avatar: { type: String },
+    avatar:       { type: String },
+    googleId:     { type: String, sparse: true, index: true }, // Google OAuth ID
 
     isVerified: { type: Boolean, default: false },
     role: {
