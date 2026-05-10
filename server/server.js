@@ -1,44 +1,132 @@
+'use strict';
+
+// ── Load & validate environment FIRST — crashes if any required var is missing ──
+require('dotenv').config();
+const env = require('./config/env');
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
+const helmet = require('helmet');
 const path = require('path');
 
-dotenv.config();
+const { startInactivityJob } = require('./utils/inactivityJob');
 
+// ── App bootstrap ─────────────────────────────────────────────────────────────
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ── Security headers (helmet) ─────────────────────────────────────────────────
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: 'same-site' },
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                imgSrc: ["'self'", 'data:', 'blob:'],
+                scriptSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+            },
+        },
+    })
+);
 
-// Serve Static Files (Uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// ── CORS — only allow configured client origin ────────────────────────────────
+app.use(
+    cors({
+        origin: env.CLIENT_URL,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
+    })
+);
 
-// Database Connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+// ── Body parsing ──────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
-// Routes
-const authRoutes = require('./routes/auth');
-const assetRoutes = require('./routes/assets');
-const contactRoutes = require('./routes/contacts');
-const safetyRoutes = require('./routes/safety');
+// ── Trust proxy (needed for accurate IPs behind nginx/load-balancer) ──────────
+app.set('trust proxy', 1);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', require('./routes/users'));
-app.use('/api/assets', assetRoutes);
-app.use('/api/contacts', contactRoutes);
-app.use('/api/safety', safetyRoutes);
-app.use('/api/logs', require('./routes/logs'));
+// ── Static uploads ────────────────────────────────────────────────────────────
+// Only avatars are served statically. Encrypted asset files are served
+// via the authenticated /api/assets/:id/download endpoint.
+app.use(
+    '/uploads/avatars',
+    express.static(path.join(__dirname, 'uploads', 'avatars'), {
+        maxAge: '1d',
+        dotfiles: 'deny',
+    })
+);
 
-app.get('/', (req, res) => {
-    res.send('TrustGate API is running');
+// ── MongoDB connection ────────────────────────────────────────────────────────
+mongoose
+    .connect(env.MONGODB_URI)
+    .then(() => {
+        console.log('✅  MongoDB connected.');
+        // Start inactivity cron AFTER db is ready
+        startInactivityJob();
+    })
+    .catch((err) => {
+        console.error('❌  MongoDB connection failed:', err.message);
+        process.exit(1);
+    });
+
+// ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api/auth',     require('./routes/auth'));
+app.use('/api/users',    require('./routes/users'));
+app.use('/api/assets',   require('./routes/assets'));
+app.use('/api/contacts', require('./routes/contacts'));
+app.use('/api/safety',   require('./routes/safety'));
+app.use('/api/logs',     require('./routes/logs'));
+
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+    res.json({
+        status: 'ok',
+        env: env.NODE_ENV,
+        time: new Date().toISOString(),
+    });
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// ── 404 handler ───────────────────────────────────────────────────────────────
+app.use((_req, res) => {
+    res.status(404).json({ message: 'Route not found.' });
 });
+
+// ── Global error handler — never leaks stack traces to the client ─────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+    const isDev = env.NODE_ENV === 'development';
+    console.error('[Error]', err);
+
+    // Multer errors
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ message: 'File is too large.' });
+    }
+
+    res.status(err.status || 500).json({
+        message: err.message || 'An unexpected error occurred.',
+        ...(isDev ? { stack: err.stack } : {}),
+    });
+});
+
+// ── Start server ──────────────────────────────────────────────────────────────
+const server = app.listen(env.PORT, () => {
+    console.log(`🚀  TrustGate API running on port ${env.PORT} [${env.NODE_ENV}]`);
+});
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+const shutdown = (signal) => {
+    console.log(`\n🛑  Received ${signal}. Shutting down gracefully...`);
+    server.close(() => {
+        mongoose.connection.close(false, () => {
+            console.log('✅  MongoDB connection closed. Goodbye.');
+            process.exit(0);
+        });
+    });
+    // Force kill after 10s
+    setTimeout(() => process.exit(1), 10_000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));

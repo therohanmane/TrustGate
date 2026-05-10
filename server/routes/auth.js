@@ -1,254 +1,269 @@
+'use strict';
+
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-
-const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-// Helper to generate JWT
-const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'secret_key_123', {
-        expiresIn: '30d',
-    });
-};
-
-// Nodemailer Transporter
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-// In-memory OTP Store (For demo purposes)
-const otpStore = {};
-
-// POST /api/auth/forgot-password
-router.post('/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Generate Reset Token
-        const resetToken = crypto.randomBytes(20).toString('hex');
-
-        // Hash and set to resetPasswordToken
-        user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 Minutes
-
-        await user.save();
-
-        // Create reset url
-        const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
-
-        const message = `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-                <h2>Password Reset Request</h2>
-                <p>You requested a password reset. Please click the link below to verify:</p>
-                <a href="${resetUrl}" style="background: #4da6ff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
-                <p style="margin-top: 20px; font-size: 12px; color: gray;">If you did not make this request, please ignore this email.</p>
-            </div>
-        `;
-
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'TrustGate Password Reset',
-            html: message
-        });
-
-        res.json({ message: 'Email sent' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Email could not be sent' });
-    }
-});
-
-// POST /api/auth/reset-password/:token
-router.post('/reset-password/:token', async (req, res) => {
-    try {
-        const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
-
-        const user = await User.findOne({
-            resetPasswordToken,
-            resetPasswordExpire: { $gt: Date.now() }
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid token' });
-        }
-
-        // Set new password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(req.body.password, salt);
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpire = undefined;
-
-        await user.save();
-
-        res.json({ message: 'Password updated successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// POST /api/auth/send-otp
-router.post('/send-otp', async (req, res) => {
-    try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ message: 'Email is required' });
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-        // Store OTP with 10 min expiry
-        otpStore[email] = {
-            otp,
-            expires: Date.now() + 10 * 60 * 1000
-        };
-
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'TrustGate Verification Code',
-            html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2>Verify your Email</h2>
-                    <p>Your verification code for TrustGate is:</p>
-                    <h1 style="color: #4da6ff; letter-spacing: 5px;">${otp}</h1>
-                    <p>This code expires in 10 minutes.</p>
-                   </div>`
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.json({ message: 'OTP sent successfully' });
-
-    } catch (error) {
-        console.error('Email Error:', error);
-        res.status(500).json({ message: 'Failed to send OTP', error: error.message });
-    }
-});
-
-// POST /api/auth/verify-otp
-router.post('/verify-otp', async (req, res) => {
-    try {
-        const { email, otp } = req.body;
-
-        if (!otpStore[email]) {
-            return res.status(400).json({ message: 'No OTP found for this email' });
-        }
-
-        const { otp: storedOtp, expires } = otpStore[email];
-
-        if (Date.now() > expires) {
-            delete otpStore[email];
-            return res.status(400).json({ message: 'OTP expired' });
-        }
-
-        if (storedOtp !== otp) {
-            return res.status(400).json({ message: 'Invalid OTP' });
-        }
-
-        // OTP Valid
-        delete otpStore[email]; // Verify once
-        res.json({ message: 'Verification successful' });
-
-    } catch (error) {
-        res.status(500).json({ message: 'Verification failed' });
-    }
-});
-
+const User = require('../models/User');
+const OtpStore = require('../models/OtpStore');
+const { JWT_SECRET, JWT_EXPIRE, CLIENT_URL } = require('../config/env');
+const { authLimiter, otpLimiter } = require('../middleware/rateLimiter');
+const {
+    registerRules,
+    loginRules,
+    forgotPasswordRules,
+    resetPasswordRules,
+    sendOtpRules,
+    verifyOtpRules,
+    handleValidation,
+} = require('../middleware/validate');
+const { sendPasswordReset, sendOtp } = require('../utils/mailer');
+const { protect } = require('../middleware/authMiddleware');
 const logActivity = require('../utils/logger');
 
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const generateToken = (id) =>
+    jwt.sign({ id }, JWT_SECRET, { expiresIn: JWT_EXPIRE });
+
+// Apply auth rate limiter to the entire auth router
+router.use(authLimiter);
+
+// ── POST /api/auth/register ───────────────────────────────────────────────────
+router.post('/register', registerRules, handleValidation, async (req, res) => {
     try {
         const { name, email, password, phone } = req.body;
 
-        // Check if user exists
         const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ message: 'An account with this email already exists.' });
         }
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
+        const salt = await bcrypt.genSalt(12);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create user
         const user = await User.create({
             name,
             email,
             password: hashedPassword,
-            phone
+            phone,
         });
 
-        if (user) {
-            await logActivity(user._id, 'REGISTER', 'User registration successful', req);
-            res.status(201).json({
-                _id: user.id,
-                name: user.name,
-                email: user.email,
-                token: generateToken(user._id),
-            });
-        } else {
-            res.status(400).json({ message: 'Invalid user data' });
+        await logActivity(user._id, 'REGISTER', 'User registration successful.', req);
+
+        return res.status(201).json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            token: generateToken(user._id),
+        });
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(400).json({ message: 'An account with this email already exists.' });
         }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        return res.status(500).json({ message: 'Registration failed. Please try again.' });
     }
 });
 
-// POST /api/auth/login
-router.post('/login', async (req, res) => {
+// ── POST /api/auth/login ──────────────────────────────────────────────────────
+router.post('/login', loginRules, handleValidation, async (req, res) => {
     try {
         const { email, password } = req.body;
 
         const user = await User.findOne({ email });
 
-        if (user && (await bcrypt.compare(password, user.password))) {
-            // Update last active
-            user.lastActive = Date.now();
-            await user.save();
-
-            await logActivity(user._id, 'LOGIN', 'User logged in successfully', req);
-
-            res.json({
-                _id: user.id,
-                name: user.name,
-                email: user.email,
-                isVerified: user.isVerified,
-                token: generateToken(user._id),
-            });
-        } else {
-            res.status(401).json({ message: 'Invalid email or password' });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            // Constant-time generic message (don't reveal which is wrong)
+            return res.status(401).json({ message: 'Invalid email or password.' });
         }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+
+        // Reset grace period flags on login
+        if (user.gracePeriodWarned) {
+            user.gracePeriodWarned = false;
+            user.gracePeriodWarnedAt = undefined;
+        }
+        user.lastActive = new Date();
+        await user.save({ validateBeforeSave: false });
+
+        await logActivity(user._id, 'LOGIN', 'User logged in successfully.', req);
+
+        return res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            isVerified: user.isVerified,
+            releaseTriggered: user.releaseTriggered,
+            token: generateToken(user._id),
+        });
+    } catch (err) {
+        return res.status(500).json({ message: 'Login failed. Please try again.' });
     }
 });
 
-// POST /api/auth/verify-aadhaar (Mock)
-router.post('/verify-aadhaar', async (req, res) => {
+// ── POST /api/auth/send-otp ───────────────────────────────────────────────────
+router.post('/send-otp', otpLimiter, sendOtpRules, handleValidation, async (req, res) => {
     try {
-        const { number, userId } = req.body;
+        const { email } = req.body;
 
-        // Simulating UIDAI verification delay
-        setTimeout(async () => {
-            // Update user status
-            // In a real app, we would verify the Aadhaar number with an external API
-            // For this project, we assume any 12 digit number is valid
-            res.json({ success: true, message: 'Identity verified successfully', aadhaarLast4: number.slice(-4) });
-        }, 1000);
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const hashedOtp = OtpStore.hashOtp(otp);
 
-    } catch (error) {
-        res.status(500).json({ message: 'Verification failed' });
+        // Upsert OTP record (one per email, TTL 10 min)
+        await OtpStore.findOneAndUpdate(
+            { email },
+            {
+                hashedOtp,
+                attempts: 0,
+                expires: new Date(Date.now() + 10 * 60 * 1000),
+            },
+            { upsert: true, new: true }
+        );
+
+        await sendOtp(email, otp);
+
+        return res.json({ message: 'OTP sent successfully.' });
+    } catch (err) {
+        console.error('[OTP] Send error:', err.message);
+        return res.status(500).json({ message: 'Failed to send OTP. Please try again.' });
+    }
+});
+
+// ── POST /api/auth/verify-otp ─────────────────────────────────────────────────
+router.post('/verify-otp', verifyOtpRules, handleValidation, async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const MAX_ATTEMPTS = 3;
+
+        const record = await OtpStore.findOne({ email });
+
+        if (!record) {
+            return res.status(400).json({ message: 'No OTP found for this email. Please request a new one.' });
+        }
+
+        if (new Date() > record.expires) {
+            await OtpStore.deleteOne({ email });
+            return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+        }
+
+        if (!record.isValid(otp)) {
+            record.attempts += 1;
+            await record.save();
+
+            if (record.attempts >= MAX_ATTEMPTS) {
+                await OtpStore.deleteOne({ email });
+                return res.status(400).json({ message: 'Too many incorrect attempts. Please request a new OTP.' });
+            }
+
+            return res.status(400).json({
+                message: `Invalid OTP. ${MAX_ATTEMPTS - record.attempts} attempt(s) remaining.`,
+            });
+        }
+
+        // ✅ Valid — consume it
+        await OtpStore.deleteOne({ email });
+
+        // Mark user as verified if they exist
+        await User.findOneAndUpdate({ email }, { isVerified: true });
+
+        return res.json({ message: 'Verification successful.' });
+    } catch (err) {
+        return res.status(500).json({ message: 'Verification failed. Please try again.' });
+    }
+});
+
+// ── POST /api/auth/forgot-password ───────────────────────────────────────────
+router.post('/forgot-password', forgotPasswordRules, handleValidation, async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        const user = await User.findOne({ email });
+
+        // Always return 200 to prevent email enumeration
+        if (!user) {
+            return res.json({ message: 'If an account with that email exists, a reset link has been sent.' });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+        user.resetPasswordExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+        await user.save({ validateBeforeSave: false });
+
+        try {
+            await sendPasswordReset(email, resetToken);
+        } catch (mailErr) {
+            // Roll back token if email fails
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            await user.save({ validateBeforeSave: false });
+            return res.status(500).json({ message: 'Email could not be sent. Please try again.' });
+        }
+
+        return res.json({ message: 'If an account with that email exists, a reset link has been sent.' });
+    } catch (err) {
+        return res.status(500).json({ message: 'Server error. Please try again.' });
+    }
+});
+
+// ── POST /api/auth/reset-password/:token ─────────────────────────────────────
+router.post('/reset-password/:token', resetPasswordRules, handleValidation, async (req, res) => {
+    try {
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(req.params.token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpire: { $gt: new Date() },
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Reset link is invalid or has expired.' });
+        }
+
+        const salt = await bcrypt.genSalt(12);
+        user.password = await bcrypt.hash(req.body.password, salt);
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+        await user.save();
+
+        await logActivity(user._id, 'RESET_PASSWORD', 'Password reset via email token.', req);
+
+        return res.json({ message: 'Password updated successfully. You can now log in.' });
+    } catch (err) {
+        return res.status(500).json({ message: 'Server error. Please try again.' });
+    }
+});
+
+// ── POST /api/auth/ping ───────────────────────────────────────────────────────
+// Frontend calls this periodically to update lastActive (heartbeat)
+router.post('/ping', protect, async (req, res) => {
+    // lastActive is already updated by protect middleware
+    return res.json({ message: 'Activity recorded.', lastActive: req.user.lastActive });
+});
+
+// ── POST /api/auth/verify-aadhaar (mock) ─────────────────────────────────────
+router.post('/verify-aadhaar', protect, async (req, res) => {
+    try {
+        const { number } = req.body;
+
+        if (!number || !/^\d{12}$/.test(number)) {
+            return res.status(400).json({ message: 'Aadhaar number must be exactly 12 digits.' });
+        }
+
+        // Simulated UIDAI delay
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        return res.json({
+            success: true,
+            message: 'Identity verified successfully.',
+            aadhaarLast4: number.slice(-4),
+        });
+    } catch (err) {
+        return res.status(500).json({ message: 'Verification failed.' });
     }
 });
 

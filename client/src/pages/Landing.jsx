@@ -1,170 +1,326 @@
-import React from 'react';
-import Navbar from '../components/Navbar';
-import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
-import { motion } from 'framer-motion';
-import { Shield, Clock, Lock, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const features = [
-    {
-        icon: Lock,
-        title: "The Digital Vault",
-        description: "A secure fortress for your most sensitive documents, financial details, and final wishes. AES-256 encrypted."
-    },
-    {
-        icon: Users,
-        title: "Legacy Contacts",
-        description: "Designate family members or legal guardians who will receive access only when you are no longer here."
-    },
-    {
-        icon: Clock,
-        title: "Inactivity Protocol",
-        description: "If you don't check in for a set period (30-90 days), our system initiates the safety checks."
-    },
-    {
-        icon: Shield,
-        title: "Emotional Safety",
-        description: "Leave voice notes, video messages, and letters for your loved ones to comfort them in difficult times."
-    }
+/* ─── Keyframes injected once ─── */
+const STYLE = `
+@keyframes fadeUp { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideRight { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:translateX(0)} }
+@keyframes slideLeft  { from{opacity:0;transform:translateX(40px)}  to{opacity:1;transform:translateX(0)} }
+@keyframes scaleIn  { from{opacity:0;transform:scale(0.85)} to{opacity:1;transform:scale(1)} }
+@keyframes pulse2   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+@keyframes orbit    { from{transform:rotate(0deg) translateX(180px) rotate(0deg)} to{transform:rotate(360deg) translateX(180px) rotate(-360deg)} }
+@keyframes drift    { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(30px,-20px) scale(1.05)} }
+.fu  { animation: fadeUp    .7s cubic-bezier(.22,1,.36,1) both }
+.fi  { animation: fadeIn    .6s ease both }
+.sr  { animation: slideRight .6s cubic-bezier(.22,1,.36,1) both }
+.sl  { animation: slideLeft  .6s cubic-bezier(.22,1,.36,1) both }
+.sc  { animation: scaleIn   .6s cubic-bezier(.22,1,.36,1) both }
+.d1  { animation-delay:.1s } .d2{animation-delay:.2s} .d3{animation-delay:.35s}
+.d4  { animation-delay:.5s } .d5{animation-delay:.65s} .d6{animation-delay:.8s}
+`;
+
+const SLIDES = [
+  { id: 'hero',     label: 'Home' },
+  { id: 'how',      label: 'How It Works' },
+  { id: 'features', label: 'Features' },
+  { id: 'security', label: 'Security' },
+  { id: 'cta',      label: 'Get Started' },
 ];
 
-const Landing = () => {
-    return (
-        <div className="min-h-screen bg-background text-foreground overflow-hidden relative selection:bg-neon-blue/30 transition-colors duration-300">
-            {/* Background Elements */}
-            <div className="fixed inset-0 pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-500/10 dark:bg-neon-purple/10 rounded-full blur-[120px] opacity-40 mix-blend-screen" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 dark:bg-neon-blue/10 rounded-full blur-[120px] opacity-40 mix-blend-screen" />
-            </div>
+const STEPS = [
+  { icon: '🔐', n: '01', title: 'Upload Your Digital Life',   text: 'Store insurance policies, bank credentials, crypto wallets, property documents — any file type, AES-256 encrypted.' },
+  { icon: '👨‍👩‍👧', n: '02', title: 'Assign Trusted Contacts',   text: 'Designate family members or legal guardians. Control granular permissions — who sees what, and when.' },
+  { icon: '⏱️', n: '03', title: 'Set Inactivity Rules',       text: "Define your check-in period (30–90 days). If you don't respond to pings, safety checks trigger before release." },
+  { icon: '💌', n: '04', title: 'Your Legacy Is Delivered',   text: 'After all verifications, trusted contacts receive secure access — documents, passwords, voice notes, videos.' },
+];
 
-            <Navbar />
+const FEATS = [
+  { icon: '🏦', title: 'Financial Documents', text: 'Bank accounts, FDs, insurance, PF, investments — organized and secured.' },
+  { icon: '🔑', title: 'Digital Credentials', text: 'Email, social media, crypto seed phrases — no valuable identity lost.' },
+  { icon: '📄', title: 'Legal Documents',      text: 'Wills, property papers, Aadhaar, PAN, vehicle RCs — safely vaulted.' },
+  { icon: '🎥', title: 'Personal Messages',    text: 'Video letters, voice notes, written messages — your final words preserved.' },
+  { icon: '🛡️', title: "Dead Man's Switch",    text: 'Intelligent inactivity monitor with multiple safety checks — no accidental release.' },
+  { icon: '📱', title: 'Multi-Channel Alerts', text: 'Check-in reminders via email, SMS, and app — simple for everyone.' },
+];
 
-            <main className="relative pt-32 pb-20 px-6 container mx-auto">
-                {/* Hero Section */}
-                <div className="flex flex-col items-center text-center mb-32 relative z-10">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mb-6 px-4 py-1.5 rounded-full bg-blue-500/10 dark:bg-neon-blue/10 border border-blue-500/20 dark:border-neon-blue/20 text-sm text-blue-600 dark:text-neon-blue font-medium shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(0,229,255,0.3)]"
-                    >
-                        🔒 India's First Controlled Digital Asset Release System
-                    </motion.div>
+export default function Landing() {
+  const nav = useNavigate();
+  const [slide, setSlide] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+  const [hovBtn, setHovBtn] = useState('');
+  const lockRef = useRef(false);
 
-                    <motion.h1
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-5xl md:text-7xl font-bold mb-8 leading-tight text-gray-900 dark:text-white tracking-tight"
-                    >
-                        Your Life. Your Secrets. <br />
-                        <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 dark:from-neon-blue dark:via-neon-purple dark:to-neon-blue bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                            Released Only When It Matters.
-                        </span>
-                    </motion.h1>
+  const goTo = useCallback((idx) => {
+    if (lockRef.current || idx === slide || idx < 0 || idx >= SLIDES.length) return;
+    lockRef.current = true;
+    setSlide(idx);
+    setAnimKey(k => k + 1);
+    setTimeout(() => { lockRef.current = false; }, 900);
+  }, [slide]);
 
-                    <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="text-xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl leading-relaxed"
-                    >
-                        TrustGate acts as your digital executor. We monitor your activity and securely release your critical data (passwords, will, messages) to your trusted family members
-                        <span className="text-gray-900 dark:text-white font-semibold"> only if you become inactive</span>.
-                    </motion.p>
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') goTo(slide + 1);
+      if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft')  goTo(slide - 1);
+    };
+    const onWheel = (e) => {
+      if (e.deltaY > 30)  goTo(slide + 1);
+      if (e.deltaY < -30) goTo(slide - 1);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('wheel',   onWheel, { passive: true });
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
+  }, [slide, goTo]);
 
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="flex flex-col sm:flex-row gap-4"
-                    >
-                        <Link to="/signup">
-                            <Button variant="primary" className="text-lg px-8 py-4 shadow-[0_0_30px_rgba(37,99,235,0.3)] dark:shadow-[0_0_30px_rgba(124,77,255,0.4)] hover:shadow-[0_0_50px_rgba(37,99,235,0.5)] dark:hover:shadow-[0_0_50px_rgba(124,77,255,0.6)]">
-                                Create My Secure Vault
-                            </Button>
-                        </Link>
-                        <Button variant="glass" className="text-lg px-8 py-4 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10">
-                            See How It Works
-                        </Button>
-                    </motion.div>
-                </div>
+  /* Touch swipe */
+  const touchY = useRef(null);
+  const onTouchStart = (e) => { touchY.current = e.touches[0].clientY; };
+  const onTouchEnd   = (e) => {
+    if (touchY.current === null) return;
+    const dy = touchY.current - e.changedTouches[0].clientY;
+    if (dy >  40) goTo(slide + 1);
+    if (dy < -40) goTo(slide - 1);
+    touchY.current = null;
+  };
 
-                {/* Features Section */}
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-                    {features.map((feature, index) => (
-                        <Card key={index} className="group hover:-translate-y-2 transition-transform duration-300 bg-white/50 dark:bg-white/5 border-gray-200 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10 shadow-lg dark:shadow-none">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-neon-blue/20 dark:to-neon-purple/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 border border-gray-100 dark:border-white/5">
-                                <feature.icon className="text-blue-600 dark:text-neon-blue" size={28} />
-                            </div>
-                            <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">{feature.title}</h3>
-                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">{feature.description}</p>
-                        </Card>
-                    ))}
-                </div>
+  return (
+    <>
+      <style>{STYLE}</style>
 
-                {/* Trust/Emotional Section */}
-                <div className="mt-32 text-center max-w-4xl mx-auto">
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Designed for Indian Families & Seniors</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mb-12">
-                        We understand that technology can be overwhelming. TrustGate is built to be simple, accessible, and emotionally sensitive for every citizen.
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                        <div className="text-center">
-                            <div className="text-4xl font-bold text-green-500 dark:text-neon-green mb-2">AES-256</div>
-                            <div className="text-sm text-gray-500 uppercase tracking-wider">Encryption</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl font-bold text-blue-500 dark:text-neon-blue mb-2">100%</div>
-                            <div className="text-sm text-gray-500 uppercase tracking-wider">Privacy</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl font-bold text-purple-500 dark:text-neon-purple mb-2">24/7</div>
-                            <div className="text-sm text-gray-500 uppercase tracking-wider">Monitoring</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl font-bold text-red-500 dark:text-neon-red mb-2">SOS</div>
-                            <div className="text-sm text-gray-500 uppercase tracking-wider">Safety Tools</div>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            {/* Footer */}
-            <footer className="border-t border-gray-200 dark:border-white/10 py-12 text-center text-gray-500 bg-white/80 dark:bg-black/40 backdrop-blur-sm relative z-10">
-                <div className="container mx-auto px-6">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div className="text-left">
-                            <div className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white mb-2">
-                                <Shield className="text-blue-600 dark:text-neon-blue" size={24} />
-                                TrustGate
-                            </div>
-                            <p className="text-sm">Empowering every Indian to secure their digital legacy.</p>
-                        </div>
-                        <div className="flex flex-col md:flex-row gap-8 text-sm text-left">
-                            <div>
-                                <h4 className="font-bold text-gray-900 dark:text-white mb-2">Contact Support</h4>
-                                <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                                    <p><span className="text-blue-600 dark:text-neon-blue">Rohan Mane:</span> 7841910823</p>
-                                    <a href="mailto:rohanmane0823@gmail.com" className="hover:text-blue-600 dark:hover:text-white transition-colors">rohanmane0823@gmail.com</a>
-                                </div>
-                                <div className="space-y-1 text-gray-600 dark:text-gray-400 mt-2">
-                                    <p><span className="text-purple-600 dark:text-neon-purple">Anuja Wadnere:</span> 8956805564</p>
-                                    <a href="mailto:anujawadnere@gmail.com" className="hover:text-purple-600 dark:hover:text-white transition-colors">anujawadnere@gmail.com</a>
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <Link to="/privacy" className="hover:text-blue-600 dark:hover:text-neon-blue transition-colors">Privacy Policy</Link>
-                                <Link to="/terms" className="hover:text-blue-600 dark:hover:text-neon-blue transition-colors">Terms of Service</Link>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="mt-12 text-xs border-t border-gray-200 dark:border-white/5 pt-8 text-center text-gray-500">
-                        <span>© 2026 TrustGate. All rights reserved.</span>
-                    </div>
-                </div>
-            </footer>
+      {/* ── Fixed Nav ── */}
+      <nav style={{
+        position:'fixed',top:0,left:0,right:0,zIndex:200,
+        display:'flex',alignItems:'center',justifyContent:'space-between',
+        padding:'18px 48px',
+        background:'rgba(10,15,30,0.85)',backdropFilter:'blur(24px)',
+        borderBottom:'1px solid rgba(201,168,76,0.15)',
+      }}>
+        <div style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,color:'#e8c97a',cursor:'pointer'}} onClick={()=>goTo(0)}>
+          Trust<span style={{color:'#f8f4eb',opacity:.5}}>Gate</span>
         </div>
-    );
-};
+        <div style={{display:'flex',gap:32}}>
+          {['How It Works','Features','Security'].map((l,i)=>(
+            <span key={l} onClick={()=>goTo(i+1)}
+              style={{fontSize:14,color: slide===i+1?'#e8c97a':'#b0baca',cursor:'pointer',fontWeight:500,transition:'color .2s'}}>
+              {l}
+            </span>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:12,alignItems:'center'}}>
+          <span onClick={()=>nav('/login')} style={{fontSize:14,color:'#b0baca',cursor:'pointer',transition:'color .2s'}}>Sign In</span>
+          <button onClick={()=>nav('/signup')} style={{
+            background:'linear-gradient(135deg,#c9a84c,#e8c97a)',color:'#0a0f1e',
+            fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,padding:'10px 22px',
+            borderRadius:8,border:'none',cursor:'pointer',
+          }}>Create Vault</button>
+        </div>
+      </nav>
 
-export default Landing;
+      {/* ── Slide Dot Nav ── */}
+      <div style={{position:'fixed',right:28,top:'50%',transform:'translateY(-50%)',zIndex:200,display:'flex',flexDirection:'column',gap:12}}>
+        {SLIDES.map((s,i)=>(
+          <button key={s.id} onClick={()=>goTo(i)} title={s.label} style={{
+            width: i===slide?10:6, height: i===slide?10:6,
+            borderRadius:'50%',border:'none',cursor:'pointer',
+            background: i===slide?'#e8c97a':'rgba(201,168,76,0.3)',
+            transition:'all .3s',padding:0,
+            boxShadow: i===slide?'0 0 8px rgba(232,201,122,0.6)':'none',
+          }}/>
+        ))}
+      </div>
+
+      {/* ── Slide Label ── */}
+      <div style={{position:'fixed',right:46,top:'50%',transform:'translateY(-50%)',zIndex:199,writingMode:'vertical-rl',fontSize:11,letterSpacing:'0.12em',color:'rgba(201,168,76,0.4)',fontWeight:500,textTransform:'uppercase',userSelect:'none'}}>
+        {SLIDES[slide].label}
+      </div>
+
+      {/* ── Slide Progress Bar ── */}
+      <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:200,height:2,background:'rgba(201,168,76,0.1)'}}>
+        <div style={{height:'100%',background:'linear-gradient(90deg,#c9a84c,#e8c97a)',width:`${((slide+1)/SLIDES.length)*100}%`,transition:'width .6s cubic-bezier(.22,1,.36,1)'}}/>
+      </div>
+
+      {/* ── Arrow Hints ── */}
+      {slide < SLIDES.length-1 && (
+        <div onClick={()=>goTo(slide+1)} style={{position:'fixed',bottom:24,left:'50%',transform:'translateX(-50%)',zIndex:200,cursor:'pointer',opacity:.5,animation:'fadeUp 1s ease infinite alternate',fontSize:22}}>
+          ↓
+        </div>
+      )}
+
+      {/* ── Viewport ── */}
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        style={{position:'fixed',inset:0,overflow:'hidden'}}>
+
+        {/* BG Orbs */}
+        <div style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>
+          <div style={{position:'absolute',width:700,height:700,borderRadius:'50%',background:'radial-gradient(circle,rgba(201,168,76,0.07) 0%,transparent 70%)',top:-200,right:-100,animation:'drift 12s ease-in-out infinite'}}/>
+          <div style={{position:'absolute',width:500,height:500,borderRadius:'50%',background:'radial-gradient(circle,rgba(42,53,96,0.5) 0%,transparent 70%)',bottom:-100,left:-150,animation:'drift 15s ease-in-out infinite reverse'}}/>
+        </div>
+
+        {/* ─────── SLIDE 0 : HERO ─────── */}
+        {slide===0 && (
+          <div key={`hero-${animKey}`} style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',justifyContent:'center',padding:'0 8vw',paddingTop:80}}>
+            <div className="fu d1" style={{display:'inline-flex',alignItems:'center',gap:8,background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:100,padding:'6px 16px',fontSize:12,color:'#e8c97a',fontWeight:500,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:28,width:'fit-content'}}>
+              <span style={{width:6,height:6,background:'#c9a84c',borderRadius:'50%',animation:'pulse2 2s infinite',display:'inline-block'}}/>
+              🔒 India's First Digital Legacy Platform
+            </div>
+            <h1 className="fu d2" style={{fontSize:'clamp(52px,7vw,92px)',fontWeight:800,lineHeight:1.02,letterSpacing:-2,color:'#f8f4eb',marginBottom:24,maxWidth:900}}>
+              Your family deserves<br/>
+              to know <span style={{background:'linear-gradient(135deg,#c9a84c,#f0dfa0)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>everything</span><br/>
+              when it matters.
+            </h1>
+            <p className="fu d3" style={{fontSize:18,color:'#b0baca',maxWidth:520,lineHeight:1.7,marginBottom:40,fontWeight:300}}>
+              TrustGate is your digital executor. Upload passwords, insurance docs, crypto keys, and personal messages —{' '}
+              <strong style={{color:'#f8f4eb',fontWeight:500}}>encrypted and released automatically</strong>{' '}
+              to your loved ones only when you become inactive.
+            </p>
+            <div className="fu d4" style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:60}}>
+              <button
+                onMouseEnter={()=>setHovBtn('p')} onMouseLeave={()=>setHovBtn('')}
+                onClick={()=>nav('/signup')}
+                style={{background:'linear-gradient(135deg,#c9a84c,#e8c97a)',color:'#0a0f1e',fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:15,padding:'16px 36px',borderRadius:10,border:'none',cursor:'pointer',transition:'all .2s',...(hovBtn==='p'?{transform:'translateY(-2px)',boxShadow:'0 12px 40px rgba(201,168,76,0.35)'}:{})}}>
+                Create My Secure Vault →
+              </button>
+              <button
+                onMouseEnter={()=>setHovBtn('g')} onMouseLeave={()=>setHovBtn('')}
+                onClick={()=>goTo(1)}
+                style={{background: hovBtn==='g'?'rgba(255,255,255,0.06)':'transparent',color:'#f8f4eb',fontFamily:"'Syne',sans-serif",fontWeight:600,fontSize:15,padding:'16px 36px',borderRadius:10,border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',transition:'all .2s'}}>
+                See How It Works
+              </button>
+            </div>
+            <div className="fu d5" style={{display:'flex',gap:48,alignItems:'center',paddingTop:24,borderTop:'1px solid rgba(201,168,76,0.15)'}}>
+              {[['AES-256','Encryption'],['100%','Private'],['24/7','Monitoring'],['∞','Asset Types']].map(([num,label],i,arr)=>(
+                <React.Fragment key={label}>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:800,color:'#e8c97a'}}>{num}</div>
+                    <div style={{fontSize:10,color:'#8892aa',textTransform:'uppercase',letterSpacing:'0.1em',marginTop:2}}>{label}</div>
+                  </div>
+                  {i<arr.length-1 && <div style={{width:1,height:36,background:'rgba(201,168,76,0.2)'}}/>}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─────── SLIDE 1 : HOW IT WORKS ─────── */}
+        {slide===1 && (
+          <div key={`how-${animKey}`} style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',justifyContent:'center',padding:'0 8vw',paddingTop:80,overflowY:'auto'}}>
+            <div className="sr d1" style={{fontSize:11,letterSpacing:'0.15em',textTransform:'uppercase',color:'#c9a84c',fontWeight:600,marginBottom:12}}>How TrustGate Works</div>
+            <h2 className="fu d2" style={{fontSize:'clamp(32px,4vw,56px)',fontWeight:800,color:'#f8f4eb',letterSpacing:-1,marginBottom:48}}>Simple. Automatic.<br/>Life-changing.</h2>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:2,borderRadius:16,overflow:'hidden',border:'1px solid rgba(201,168,76,0.15)'}}>
+              {STEPS.map((st,i)=>(
+                <StepCard key={i} step={st} delay={i} animKey={animKey}/>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─────── SLIDE 2 : FEATURES ─────── */}
+        {slide===2 && (
+          <div key={`feats-${animKey}`} style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',justifyContent:'center',padding:'0 8vw',paddingTop:80,overflowY:'auto'}}>
+            <div className="sr d1" style={{fontSize:11,letterSpacing:'0.15em',textTransform:'uppercase',color:'#c9a84c',fontWeight:600,marginBottom:12}}>Everything You Need</div>
+            <h2 className="fu d2" style={{fontSize:'clamp(32px,4vw,56px)',fontWeight:800,color:'#f8f4eb',letterSpacing:-1,marginBottom:40}}>Built for the modern<br/>Indian family.</h2>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
+              {FEATS.map((f,i)=><FeatCard key={f.title} feat={f} delay={i} animKey={animKey}/>)}
+            </div>
+          </div>
+        )}
+
+        {/* ─────── SLIDE 3 : SECURITY ─────── */}
+        {slide===3 && (
+          <div key={`sec-${animKey}`} style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 8vw',paddingTop:80}}>
+            <div style={{display:'flex',gap:80,alignItems:'center',maxWidth:1100,width:'100%'}}>
+              <div style={{flex:1}}>
+                <div className="sr d1" style={{fontSize:11,letterSpacing:'0.15em',textTransform:'uppercase',color:'#c9a84c',fontWeight:600,marginBottom:12}}>Security First</div>
+                <h2 className="fu d2" style={{fontSize:'clamp(36px,4vw,60px)',fontWeight:800,color:'#f8f4eb',letterSpacing:-1,lineHeight:1.1,marginBottom:24}}>Your data never<br/>leaves your hands.</h2>
+                <p className="fu d3" style={{fontSize:16,color:'#b0baca',lineHeight:1.8,maxWidth:440,fontWeight:300}}>
+                  We use AES-256 encryption — the same standard used by banks, militaries, and intelligence agencies worldwide. Your files are encrypted before they ever reach our servers.
+                </p>
+                <div className="fu d4" style={{display:'flex',gap:16,marginTop:32,flexWrap:'wrap'}}>
+                  {['TLS 1.3 Transit','Zero-Knowledge','India Compliant','GDPR Ready'].map(t=>(
+                    <span key={t} style={{fontSize:12,color:'#e8c97a',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',padding:'6px 14px',borderRadius:100,fontWeight:500}}>{t}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="sc d2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,minWidth:280}}>
+                {[['🔐','AES-256','Military Grade'],['🛡️','Zero Trust','Architecture'],['🔒','End-to-End','Encryption'],['✅','India','Compliant']].map(([icon,t,sub])=>(
+                  <div key={t} style={{background:'rgba(201,168,76,0.05)',border:'1px solid rgba(201,168,76,0.15)',borderRadius:16,padding:24,textAlign:'center'}}>
+                    <div style={{fontSize:30,marginBottom:10}}>{icon}</div>
+                    <div style={{fontSize:13,color:'#e8c97a',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>{t}</div>
+                    <div style={{fontSize:11,color:'#8892aa',marginTop:4}}>{sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─────── SLIDE 4 : CTA ─────── */}
+        {slide===4 && (
+          <div key={`cta-${animKey}`} style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 8vw',paddingTop:80,textAlign:'center'}}>
+            {/* Decorative ring */}
+            <div style={{position:'absolute',width:400,height:400,borderRadius:'50%',border:'1px solid rgba(201,168,76,0.08)',pointerEvents:'none'}}/>
+            <div style={{position:'absolute',width:600,height:600,borderRadius:'50%',border:'1px solid rgba(201,168,76,0.05)',pointerEvents:'none'}}/>
+            <div className="fi d1" style={{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',color:'#c9a84c',fontWeight:600,marginBottom:20}}>Start Today</div>
+            <h2 className="fu d2" style={{fontSize:'clamp(36px,5vw,72px)',fontWeight:800,color:'#f8f4eb',letterSpacing:-2,lineHeight:1.05,marginBottom:24,maxWidth:800}}>
+              Secure your family's future<br/><span style={{background:'linear-gradient(135deg,#c9a84c,#f0dfa0)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>before it's too late.</span>
+            </h2>
+            <p className="fu d3" style={{fontSize:18,color:'#b0baca',maxWidth:500,lineHeight:1.7,marginBottom:48,fontWeight:300}}>
+              Join thousands of Indian families who trust TrustGate to protect what matters most.
+            </p>
+            <div className="fu d4" style={{display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center',marginBottom:48}}>
+              <button
+                onMouseEnter={()=>setHovBtn('c')} onMouseLeave={()=>setHovBtn('')}
+                onClick={()=>nav('/signup')}
+                style={{background:'linear-gradient(135deg,#c9a84c,#e8c97a)',color:'#0a0f1e',fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:16,padding:'18px 48px',borderRadius:12,border:'none',cursor:'pointer',transition:'all .2s',...(hovBtn==='c'?{transform:'translateY(-3px)',boxShadow:'0 16px 48px rgba(201,168,76,0.4)'}:{})}}>
+                Create My Free Vault →
+              </button>
+              <button
+                onClick={()=>nav('/login')}
+                style={{background:'transparent',color:'#f8f4eb',fontFamily:"'Syne',sans-serif",fontWeight:600,fontSize:16,padding:'18px 48px',borderRadius:12,border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer'}}>
+                Sign In
+              </button>
+            </div>
+            <div className="fu d5" style={{display:'flex',gap:40,color:'#8892aa',fontSize:13}}>
+              {['🔒 AES-256 Encrypted','🇮🇳 Made in India','🆓 Free to Start'].map(t=><span key={t}>{t}</span>)}
+            </div>
+            <div className="fi d6" style={{position:'absolute',bottom:32,left:0,right:0,display:'flex',justifyContent:'space-between',padding:'0 48px',fontSize:12,color:'#8892aa'}}>
+              <span>© 2026 TrustGate — Empowering Indian families.</span>
+              <div style={{display:'flex',gap:24}}>
+                {['Privacy Policy','Terms of Service','Support'].map(l=><span key={l} style={{cursor:'pointer',transition:'color .2s'}}>{l}</span>)}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
+  );
+}
+
+function StepCard({ step, delay, animKey }) {
+  const [hov, setHov] = useState(false);
+  const cls = `fu d${delay+2}`;
+  return (
+    <div className={cls} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background: hov?'#1a2240':'#12192e',padding:40,position:'relative',overflow:'hidden',transition:'background .3s',cursor:'default'}}>
+      <div style={{fontFamily:"'Syne',sans-serif",fontSize:80,fontWeight:800,color:'rgba(201,168,76,0.06)',position:'absolute',top:12,right:16,lineHeight:1,userSelect:'none'}}>{step.n}</div>
+      <div style={{width:52,height:52,borderRadius:14,background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.2)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:20,fontSize:24}}>{step.icon}</div>
+      <h3 style={{fontSize:20,fontWeight:700,color:'#f8f4eb',marginBottom:10,letterSpacing:'-0.3px'}}>{step.title}</h3>
+      <p style={{fontSize:13,color:'#b0baca',lineHeight:1.7}}>{step.text}</p>
+    </div>
+  );
+}
+
+function FeatCard({ feat, delay, animKey }) {
+  const [hov, setHov] = useState(false);
+  const cls = `sc d${delay+1}`;
+  return (
+    <div className={cls} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background: hov?'rgba(201,168,76,0.04)':'rgba(255,255,255,0.03)',border:`1px solid ${hov?'rgba(201,168,76,0.3)':'rgba(201,168,76,0.12)'}`,borderRadius:16,padding:28,transition:'all .3s',transform: hov?'translateY(-4px)':'none',cursor:'default'}}>
+      <div style={{fontSize:30,marginBottom:16}}>{feat.icon}</div>
+      <h3 style={{fontSize:16,fontWeight:700,color:'#f8f4eb',marginBottom:8}}>{feat.title}</h3>
+      <p style={{fontSize:13,color:'#b0baca',lineHeight:1.7}}>{feat.text}</p>
+    </div>
+  );
+}

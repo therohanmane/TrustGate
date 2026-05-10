@@ -1,35 +1,40 @@
+'use strict';
+
 const express = require('express');
 const router = express.Router();
+
 const Log = require('../models/Log');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { protect } = require('../middleware/authMiddleware');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
-// Middleware to verify token (Duplicate of protect in other files, ideally should be in utils/middleware.js)
-const protect = async (req, res, next) => {
-    let token;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            token = req.headers.authorization.split(' ')[1];
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = await User.findById(decoded.id).select('-password');
-            next();
-        } catch (error) {
-            res.status(401).json({ message: 'Not authorized, token failed' });
-        }
-    } else {
-        res.status(401).json({ message: 'Not authorized, no token' });
-    }
-};
+router.use(apiLimiter);
 
-// GET /api/logs
+// ── GET /api/logs ─────────────────────────────────────────────────────────────
 router.get('/', protect, async (req, res) => {
     try {
-        const logs = await Log.find({ user: req.user._id })
-            .sort({ timestamp: -1 })
-            .limit(50); // Limit to last 50 logs
-        res.json(logs);
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+        const skip = (page - 1) * limit;
+
+        const [logs, total] = await Promise.all([
+            Log.find({ user: req.user._id })
+                .sort({ timestamp: -1 })
+                .skip(skip)
+                .limit(limit),
+            Log.countDocuments({ user: req.user._id }),
+        ]);
+
+        return res.json({
+            logs,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit),
+            },
+        });
+    } catch (err) {
+        return res.status(500).json({ message: 'Failed to fetch logs.' });
     }
 });
 
